@@ -2,13 +2,17 @@
 import os
 import matplotlib.pyplot as plt
 import matplotlib.image as mping
+# from keras.src.preprocessing.image import ImageDataGenerator
+# from tensorflow.python.keras import Sequential
+# from tensorflow.python.keras.layers import Conv2D, MaxPool2D, Flatten, Dense, Dropout
 from keras.src.preprocessing.image import ImageDataGenerator
-from tensorflow.python.keras import Sequential
-from tensorflow.python.keras.layers import Conv2D, MaxPool2D, Flatten, Dense, Dropout
-from tensorflow.python.keras.models import load_model
-from PIL import Image
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Conv2D, MaxPool2D, Flatten, Dense, Dropout
+from tensorflow.keras.models import load_model
+from tensorflow.keras.preprocessing import image
 import numpy as np
-import tensorflow.compat.v1 as tf
+from PIL import Image
+import tensorflow as tf
 
 # 定义文件夹路径
 train_dir = '../Data/train'
@@ -77,17 +81,17 @@ test_datagen = ImageDataGenerator(
 train_generator = train_datagen.flow_from_directory(
     train_dir,  # 训练集存放路径
     target_size=(64, 64),  # 训练集图片尺寸
-    batch_size=32,  # 训练集批次
+    batch_size=16,  # 训练集批次
     class_mode='categorical'
-    )
+)
 
 # 设置测试集迭代器
 test_generator = test_datagen.flow_from_directory(
     test_dir,  # 测试集存放路径
     target_size=(64, 64),  # 测试集图片尺寸
-    batch_size=32,  # 测试集批次
+    batch_size=16,  # 测试集批次
     class_mode='categorical'
-    )
+)
 
 # 搭建神经网络
 model = Sequential()  # 创建一个神经网络对象
@@ -116,16 +120,40 @@ model.add(Dense(units=128, activation='relu'))  # 构建一个具有128个神经
 model.add(Dense(units=64, activation='relu'))  # 构建一个具有64个神经元的全连接层
 DROPOUT_RATE = 0.5
 model.add(Dropout(DROPOUT_RATE))  # 加入dropout，防止过拟合
-CLASS = 14
-model.add(Dense(CLASS, activation='softmax'))  # 输出层，一共14个神经元，对应14个分类
+# CLASS = 17
+model.add(Dense(units=len(train_generator.class_indices), activation='softmax'))  # 输出层，一共17个神经元，对应17个分类
 
-model.compile(optimizer='adam', loss='categorical_cross entropy', metrics=['accuracy'])
+model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
 
 # 训练模型
-model.fit(train_generator, epochs=5, validation_data=test_generator)
+# model.fit(train_generator, epochs=100, validation_data=test_generator)
 
 # 保存模型
 # model.save('flower_classifier.h5')
 
 # 加载模型
-# loaded_model = load_model('flower_classifier.h5')
+loaded_model = load_model('flower_classifier.h5')
+
+
+# 预测花朵类别的函数
+def predict_flower(img_path):
+    img = image.load_img(img_path, target_size=(64, 64))
+    img_array = image.img_to_array(img)
+    img_array = np.expand_dims(img_array, axis=0)
+    img_array /= 255  # 归一化，模型期望值是[0，1]之间的浮点数
+
+    # 使用模型进行预测
+    predictions = loaded_model.predict(img_array)
+    predicted_class = np.argmax(predictions[0])
+    print(predictions)
+
+    # 获取标签
+    labels = train_generator.class_indices
+    labels = dict((v, k) for k, v in labels.items())
+    return labels[predicted_class]
+
+
+# 测试模型
+test_image_path = "../Data/train/雏菊/image_0822.jpg"
+predict_class = predict_flower(test_image_path)
+print(f'The image is predicted as : {predict_class}')
